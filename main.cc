@@ -2,7 +2,7 @@
 #include "shooter.h"
 SDL_Renderer* renderer;
 SDL_Window* window;
-GameState* game_state;
+std::unique_ptr<GameState> game_state;
 
 static void FillRect(SDL_Rect rect, Color color) {
   SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
@@ -32,19 +32,19 @@ static void HandleEvents() {
       case SDL_KEYDOWN: {
         switch (event.key.keysym.sym) {
           case SDLK_UP: {
-            --game_state->player_pos.y;
+            game_state->player_pos.y -= game_state->player_velocity;
             break;
           }
           case SDLK_DOWN: {
-            ++game_state->player_pos.y;
+            game_state->player_pos.y += game_state->player_velocity;
             break;
           }
           case SDLK_LEFT: {
-            --game_state->player_pos.x;
+            game_state->player_pos.x -= game_state->player_velocity;
             break;
           }
           case SDLK_RIGHT: {
-            ++game_state->player_pos.x;
+            game_state->player_pos.x += game_state->player_velocity;
             break;
           }
         }
@@ -66,6 +66,7 @@ int main(int argc, char* argv[]) {
                             SDL_WINDOWPOS_CENTERED,  //
                             screen_size.x, screen_size.y, 0);
   renderer = SDL_CreateRenderer(window, 0, SDL_RENDERER_ACCELERATED);
+  game_state = std::make_unique<GameState>();
 
   Clear();
   Flush();

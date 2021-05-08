@@ -8,9 +8,11 @@ using i8 = int8_t;
 using i16 = int16_t;
 using i32 = int32_t;
 using i64 = int64_t;
+using f32 = float;
+using f64 = double;
 
 struct Vector2 {
-  u32 x, y;
+  f32 x, y;
 };
 
 using v2 = Vector2;
@@ -28,6 +30,7 @@ constexpr u32 refresh_rate = 1000 / fps;
 
 struct GameState {
   u32 frame_start;
-  bool quit;
-  v2 player_pos;
+  bool quit = false;
+  v2 player_pos = {0, 0};
+  f32 player_velocity = 20.f;
 };

@@ -1,5 +1,5 @@
 #define SDL_MAIN_HANDLED
-#include "Shooter.h"
+#include "shooter.h"
 SDL_Renderer* renderer;
 SDL_Window* window;
 GameState* game_state;

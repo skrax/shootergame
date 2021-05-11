@@ -3,6 +3,8 @@
 SDL_Renderer* renderer;
 SDL_Window* window;
 std::unique_ptr<GameState> game_state;
+std::string compilation_ts;
+std::string app_path;
 
 static void FillRect(SDL_Rect rect, Color color) {
   SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
@@ -53,6 +55,21 @@ static void HandleEvents() {
   }
 }
 
+static std::string GetCompilationTS() {
+  std::ifstream ts_f(app_path + "\\.ts_comp");
+  std::string ts;
+  std::getline(ts_f, ts);
+  return ts;
+}
+
+static void CheckCompilationTS() {
+  const auto current = GetCompilationTS();
+  if (compilation_ts != current) {
+    std::cout << "rebuilt shooter .." << std::endl;
+    compilation_ts = current;
+  }
+}
+
 static void WaitRemainingFrameTime() {
   const auto frame_time = SDL_GetTicks() - game_state->frame_start;
   SDL_Delay(std::max(frame_time, refresh_rate) - frame_time);
@@ -60,6 +77,22 @@ static void WaitRemainingFrameTime() {
 
 int main(int argc, char* argv[]) {
   SDL_SetMainReady();
+
+  app_path = SDL_GetBasePath();
+  compilation_ts = GetCompilationTS();
+
+  auto ShooterLib =
+      SDL_LoadObject(std::string(app_path + "Shooter.dll").c_str());
+  if (!ShooterLib) {
+    std::cout << "Failed to load ShooterLib" << std::endl;
+    std::exit(1);
+  }
+  void (*UpdateShooter)(void);
+  UpdateShooter = (void (*)(void))SDL_LoadFunction(ShooterLib, "Update");
+  if (!UpdateShooter) {
+    std::cout << "Failed to load Update func" << std::endl;
+    std::exit(1);
+  }
 
   SDL_Init(SDL_INIT_VIDEO);
   window = SDL_CreateWindow("Shooter", SDL_WINDOWPOS_CENTERED,
@@ -74,8 +107,12 @@ int main(int argc, char* argv[]) {
   while (!game_state->quit) {
     game_state->frame_start = SDL_GetTicks();
 
+    CheckCompilationTS();
+
     Clear();
     HandleEvents();
+
+    UpdateShooter();
 
     DrawPlayer(game_state->player_pos);
 
@@ -83,6 +120,7 @@ int main(int argc, char* argv[]) {
     Flush();
   }
 
+  SDL_UnloadObject(ShooterLib);
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
   SDL_Quit();

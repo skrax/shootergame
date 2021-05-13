@@ -1,128 +1,110 @@
 #define SDL_MAIN_HANDLED
-#include "shooter.h"
-SDL_Renderer* renderer;
-SDL_Window* window;
-std::unique_ptr<GameState> game_state;
-std::string compilation_ts;
-std::string app_path;
+#include "shooter_main.h"
+#include "runtime.h"
 
-static void FillRect(SDL_Rect rect, Color color) {
-  SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
-  SDL_RenderFillRect(renderer, &rect);
-}
+std::unique_ptr<Runtime> runtime;
 
-static void Clear() {
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-  SDL_RenderFillRect(renderer, nullptr);
-}
-static void Flush() {
-  SDL_RenderPresent(renderer);
-}
-
-static void DrawPlayer(v2 pos) {
-  FillRect({(i32)pos.x, (i32)pos.y, 40, 60}, White);
-}
-
-static void HandleEvents() {
-  SDL_Event event;
-  while (SDL_PollEvent(&event)) {
-    switch (event.type) {
-      case SDL_QUIT: {
-        game_state->quit = true;
-        break;
-      }
-      case SDL_KEYDOWN: {
-        switch (event.key.keysym.sym) {
-          case SDLK_UP: {
-            game_state->player_pos.y -= game_state->player_velocity;
-            break;
-          }
-          case SDLK_DOWN: {
-            game_state->player_pos.y += game_state->player_velocity;
-            break;
-          }
-          case SDLK_LEFT: {
-            game_state->player_pos.x -= game_state->player_velocity;
-            break;
-          }
-          case SDLK_RIGHT: {
-            game_state->player_pos.x += game_state->player_velocity;
-            break;
-          }
-        }
-      }
-    }
-  }
-}
+using UpdateF = void (*)();
+using SetRuntimeF = void (*)(Runtime*);
 
 static std::string GetCompilationTS() {
-  std::ifstream ts_f(app_path + "\\.ts_comp");
+  std::ifstream ts_f(runtime->app_path + "\\.ts_comp");
   std::string ts;
   std::getline(ts_f, ts);
   return ts;
 }
 
-static void CheckCompilationTS() {
+static bool CheckCompilationTS() {
   const auto current = GetCompilationTS();
-  if (compilation_ts != current) {
-    std::cout << "rebuilt shooter .." << std::endl;
-    compilation_ts = current;
+  if (runtime->compilation_ts != current) {
+    runtime->compilation_ts = current;
+    return false;
   }
+  return true;
 }
 
 static void WaitRemainingFrameTime() {
-  const auto frame_time = SDL_GetTicks() - game_state->frame_start;
-  SDL_Delay(std::max(frame_time, refresh_rate) - frame_time);
+  const auto frame_time = SDL_GetTicks() - runtime->frame_start;
+  SDL_Delay(std::max(frame_time, runtime->refresh_rate) - frame_time);
+}
+
+static void Clear() {
+  SDL_SetRenderDrawColor(runtime->renderer, 0, 0, 0, 0);
+  SDL_RenderFillRect(runtime->renderer, nullptr);
+}
+static void Flush() {
+  SDL_RenderPresent(runtime->renderer);
+}
+
+static void* LoadLib(void* handle_old = nullptr) {
+  if (handle_old) {
+    SDL_UnloadObject(handle_old);
+  }
+  auto lib_load_path = runtime->app_path + DllNameLoaded;
+  auto lib_built_path = runtime->app_path + DllName;
+  std::remove(lib_load_path.c_str());
+  auto rename_err = std::rename(lib_built_path.c_str(), lib_load_path.c_str());
+  std::cerr << rename_err << std::endl;
+  assert(!rename_err);
+  auto result = SDL_LoadObject(lib_load_path.c_str());
+  assert(result);
+  return result;
+}
+
+static std::pair<UpdateF, SetRuntimeF> LoadLibF(void* handle) {
+  auto Update = (UpdateF)SDL_LoadFunction(handle, UpdateFName);
+  auto SetRuntime = (SetRuntimeF)SDL_LoadFunction(handle, SetRuntimeFName);
+
+  assert(SetRuntime);
+  assert(Update);
+
+  return std::make_pair(Update, SetRuntime);
 }
 
 int main(int argc, char* argv[]) {
   SDL_SetMainReady();
 
-  app_path = SDL_GetBasePath();
-  compilation_ts = GetCompilationTS();
+  runtime = std::make_unique<Runtime>();
 
-  auto ShooterLib =
-      SDL_LoadObject(std::string(app_path + "Shooter.dll").c_str());
-  if (!ShooterLib) {
-    std::cout << "Failed to load ShooterLib" << std::endl;
-    std::exit(1);
-  }
-  void (*UpdateShooter)(void);
-  UpdateShooter = (void (*)(void))SDL_LoadFunction(ShooterLib, "Update");
-  if (!UpdateShooter) {
-    std::cout << "Failed to load Update func" << std::endl;
-    std::exit(1);
-  }
+  runtime->app_path = SDL_GetBasePath();
+  runtime->compilation_ts = GetCompilationTS();
+
+  auto ShooterLib = LoadLib();
+  auto [Update, SetRuntime] = LoadLibF(ShooterLib);
 
   SDL_Init(SDL_INIT_VIDEO);
-  window = SDL_CreateWindow("Shooter", SDL_WINDOWPOS_CENTERED,
-                            SDL_WINDOWPOS_CENTERED,  //
-                            screen_size.x, screen_size.y, 0);
-  renderer = SDL_CreateRenderer(window, 0, SDL_RENDERER_ACCELERATED);
-  game_state = std::make_unique<GameState>();
+  runtime->window =
+      SDL_CreateWindow(WindowName, SDL_WINDOWPOS_CENTERED,
+                       SDL_WINDOWPOS_CENTERED,  //
+                       runtime->screen_size.x, runtime->screen_size.y, 0);
+  runtime->renderer =
+      SDL_CreateRenderer(runtime->window, 0, SDL_RENDERER_ACCELERATED);
+
+  SetRuntime(runtime.get());
 
   Clear();
   Flush();
 
-  while (!game_state->quit) {
-    game_state->frame_start = SDL_GetTicks();
+  while (!runtime->quit) {
+    runtime->frame_start = SDL_GetTicks();
 
-    CheckCompilationTS();
+    if (!CheckCompilationTS()) {
+      ShooterLib = LoadLib(ShooterLib);
+      std::tie(Update, SetRuntime) = LoadLibF(ShooterLib);
+      SetRuntime(runtime.get());
+    }
 
     Clear();
-    HandleEvents();
 
-    UpdateShooter();
-
-    DrawPlayer(game_state->player_pos);
+    Update();
 
     WaitRemainingFrameTime();
     Flush();
   }
 
   SDL_UnloadObject(ShooterLib);
-  SDL_DestroyRenderer(renderer);
-  SDL_DestroyWindow(window);
+  SDL_DestroyRenderer(runtime->renderer);
+  SDL_DestroyWindow(runtime->window);
   SDL_Quit();
   return 0;
 }

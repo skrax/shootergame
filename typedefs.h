@@ -24,13 +24,3 @@ struct Color {
 constexpr auto Black = Color{0, 0, 0};
 constexpr auto White = Color{0xff, 0xff, 0xff};
 
-constexpr v2 screen_size = {1280, 1042};
-constexpr u32 fps = 60;
-constexpr u32 refresh_rate = 1000 / fps;
-
-struct GameState {
-  u32 frame_start;
-  bool quit = false;
-  v2 player_pos = {0, 0};
-  f32 player_velocity = 20.f;
-};

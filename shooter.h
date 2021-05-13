@@ -7,3 +7,8 @@
 #include <iostream>
 
 #include "typedefs.h"
+
+struct GameState {
+  v2 player_pos = {0, 0};
+  f32 player_velocity = 20.f;
+};

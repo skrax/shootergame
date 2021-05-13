@@ -9,6 +9,6 @@
 #include "typedefs.h"
 
 struct GameState {
-  v2 player_pos = {0, 0};
-  f32 player_velocity = 20.f;
+  v2 player_pos = {0.f, 0.f};
+  v2 player_velocity = {0.f, 0.f};
 };

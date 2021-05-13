@@ -40,14 +40,16 @@ static void* LoadLib(void* handle_old = nullptr) {
   if (handle_old) {
     SDL_UnloadObject(handle_old);
   }
+
   auto lib_load_path = runtime->app_path + DllNameLoaded;
   auto lib_built_path = runtime->app_path + DllName;
+
   std::remove(lib_load_path.c_str());
-  auto rename_err = std::rename(lib_built_path.c_str(), lib_load_path.c_str());
-  std::cerr << rename_err << std::endl;
-  assert(!rename_err);
+  std::rename(lib_built_path.c_str(), lib_load_path.c_str());
+
   auto result = SDL_LoadObject(lib_load_path.c_str());
   assert(result);
+
   return result;
 }
 

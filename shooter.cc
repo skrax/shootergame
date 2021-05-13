@@ -30,21 +30,23 @@ static void HandleEvents() {
       case SDL_KEYDOWN: {
         switch (event.key.keysym.sym) {
           case SDLK_UP: {
-            if (player->velocity.y == 0.f)
-              player->velocity.y = World::velocity * Player::boost;
-            break;
-          }
-          case SDLK_LEFT: {
-            player->velocity.x = -World::velocity;
-            break;
-          }
-          case SDLK_RIGHT: {
-            player->velocity.x = World::velocity;
+            if (player->grounded) {
+              player->velocity.y = World::units * Player::vertical_force;
+            }
             break;
           }
           case SDLK_SPACE: {
-            if (player->velocity.y == 0.f)
-              player->velocity.y = World::velocity * Player::boost;
+            if (player->grounded) {
+              player->velocity.y = World::units * Player::vertical_force;
+            }
+            break;
+          }
+          case SDLK_LEFT: {
+            player->velocity.x = -World::units * Player::horizontal_force;
+            break;
+          }
+          case SDLK_RIGHT: {
+            player->velocity.x = World::units * Player::horizontal_force;
             break;
           }
           default: {
@@ -55,12 +57,6 @@ static void HandleEvents() {
       }
       case SDL_KEYUP: {
         switch (event.key.keysym.sym) {
-          case SDLK_UP: {
-            if (player->velocity.y < 0.f) {
-              player->velocity.y = 0.f;
-            }
-            break;
-          }
           case SDLK_LEFT: {
             if (player->velocity.x < 0.f) {
               player->velocity.x = 0.f;
@@ -82,22 +78,22 @@ static void HandleEvents() {
     }
   }
 
+  if (player->pos.y > 0.f) {
+    player->velocity.y -= World::gravity * World::units;
+    player->grounded = false;
+  }
+
+  // TODO: support multiple levels
+  if (player->pos.y < 0.f) {
+    player->velocity.y = 0.f;
+    player->pos.y = 0.f;
+  }
+  if (player->pos.y == 0.f) {
+    player->grounded = true;
+  }
+
   player->pos.x += player->velocity.x;
   player->pos.y += player->velocity.y;
-
-  if (player->velocity.y > 0.f) {
-    player->velocity.y -= World::gravity;
-  }
-}
-
-static void PrintPlayerState() {
-  auto player = &game_state->player;
-  std::cout << "Position: " << player->pos.x << ", " << player->pos.y << '\n';
-
-  std::cout << "Velocity: " << player->velocity.x << ", " << player->velocity.y
-            << '\n';
-
-  std::cout << std::endl;
 }
 
 extern "C" {
@@ -107,7 +103,6 @@ EXPORT void SetRuntime(Runtime* runtime_) {
 }
 EXPORT void Update(void) {
   HandleEvents();
-  PrintPlayerState();
   DrawPlayer();
 }
 }

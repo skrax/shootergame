@@ -23,4 +23,6 @@ struct Color {
 
 constexpr auto Black = Color{0, 0, 0};
 constexpr auto White = Color{0xff, 0xff, 0xff};
+constexpr auto Grey = Color{149, 165, 166};
+constexpr auto Purple = Color{103, 65, 114, 1};
 

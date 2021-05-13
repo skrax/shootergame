@@ -5,17 +5,39 @@
 Runtime* runtime;
 std::unique_ptr<GameState> game_state;
 
-static void FillRect(SDL_Rect rect, Color color) {
+static void DrawRect(SDL_Rect rect, Color color, bool fill) {
   SDL_SetRenderDrawColor(runtime->renderer, color.r, color.g, color.b, color.a);
-  SDL_RenderFillRect(runtime->renderer, &rect);
+  fill ? SDL_RenderFillRect(runtime->renderer, &rect)
+       : SDL_RenderDrawRect(runtime->renderer, &rect);
+}
+
+static v2 ToScreenPosition(v2 position, v2 size) {
+  return {position.x, Runtime::screen_size.y - position.y - size.y};
 }
 
 static void DrawPlayer() {
-  FillRect({(i32)game_state->player.pos.x,
-            (i32)Runtime::screen_size.y - (i32)game_state->player.size.y -
-                (i32)game_state->player.pos.y,
+  const auto screen_position = ToScreenPosition(game_state->player.pos,  //
+                                                game_state->player.size);
+  DrawRect({(i32)screen_position.x, (i32)screen_position.y,  //
             (i32)game_state->player.size.x, (i32)game_state->player.size.y},
-           White);
+           White, true);
+}
+
+static void DrawTileMap() {
+  for (int y = 0; y < (i32)TileMap::size.y; ++y) {
+    for (int x = 0; x < (i32)TileMap::size.x; ++x) {
+      const auto position = v2{x * World::tile_size.x, y * World::tile_size.y};
+      const auto screen_position = ToScreenPosition(position, World::tile_size);
+      DrawRect({(i32)screen_position.x, (i32)screen_position.y,  //
+                (i32)World::tile_size.x, (i32)World::tile_size.y},
+               Grey, false);
+    }
+  }
+}
+
+static void DrawBackground() {
+  DrawRect({0, 0, (i32)Runtime::screen_size.x, (i32)Runtime::screen_size.y},
+           Purple, true);
 }
 
 static void HandleEvents() {
@@ -103,6 +125,8 @@ EXPORT void SetRuntime(Runtime* runtime_) {
 }
 EXPORT void Update(void) {
   HandleEvents();
-  DrawPlayer();
+  DrawBackground();
+  DrawTileMap();
+  // DrawPlayer();
 }
 }

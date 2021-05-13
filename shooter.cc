@@ -1,5 +1,4 @@
 #include "shooter.h"
-#include "runtime.h"
 
 #define EXPORT __declspec(dllexport)
 
@@ -11,12 +10,17 @@ static void FillRect(SDL_Rect rect, Color color) {
   SDL_RenderFillRect(runtime->renderer, &rect);
 }
 
-static void DrawPlayer(v2 pos) {
-  FillRect({(i32)pos.x, (i32)pos.y, 40, 60}, White);
+static void DrawPlayer() {
+  FillRect({(i32)game_state->player.pos.x,
+            (i32)Runtime::screen_size.y - (i32)game_state->player.size.y -
+                (i32)game_state->player.pos.y,
+            (i32)game_state->player.size.x, (i32)game_state->player.size.y},
+           White);
 }
 
 static void HandleEvents() {
   SDL_Event event;
+  auto player = &game_state->player;
   while (SDL_PollEvent(&event)) {
     switch (event.type) {
       case SDL_QUIT: {
@@ -26,19 +30,21 @@ static void HandleEvents() {
       case SDL_KEYDOWN: {
         switch (event.key.keysym.sym) {
           case SDLK_UP: {
-            game_state->player_velocity.y = -1.f;
-            break;
-          }
-          case SDLK_DOWN: {
-            game_state->player_velocity.y = 1.f;
+            if (player->velocity.y == 0.f)
+              player->velocity.y = World::velocity * Player::boost;
             break;
           }
           case SDLK_LEFT: {
-            game_state->player_velocity.x = -1.f;
+            player->velocity.x = -World::velocity;
             break;
           }
           case SDLK_RIGHT: {
-            game_state->player_velocity.x = 1.f;
+            player->velocity.x = World::velocity;
+            break;
+          }
+          case SDLK_SPACE: {
+            if (player->velocity.y == 0.f)
+              player->velocity.y = World::velocity * Player::boost;
             break;
           }
           default: {
@@ -50,26 +56,20 @@ static void HandleEvents() {
       case SDL_KEYUP: {
         switch (event.key.keysym.sym) {
           case SDLK_UP: {
-            if (game_state->player_velocity.y < 0.f) {
-              game_state->player_velocity.y = 0.f;
-            }
-            break;
-          }
-          case SDLK_DOWN: {
-            if (game_state->player_velocity.y > 0.f) {
-              game_state->player_velocity.y = 0.f;
+            if (player->velocity.y < 0.f) {
+              player->velocity.y = 0.f;
             }
             break;
           }
           case SDLK_LEFT: {
-            if (game_state->player_velocity.x < 0.f) {
-              game_state->player_velocity.x = 0.f;
+            if (player->velocity.x < 0.f) {
+              player->velocity.x = 0.f;
             }
             break;
           }
           case SDLK_RIGHT: {
-            if (game_state->player_velocity.x > 0.f) {
-              game_state->player_velocity.x = 0.f;
+            if (player->velocity.x > 0.f) {
+              player->velocity.x = 0.f;
             }
             break;
           }
@@ -81,8 +81,23 @@ static void HandleEvents() {
       }
     }
   }
-  game_state->player_pos.x += game_state->player_velocity.x;
-  game_state->player_pos.y += game_state->player_velocity.y;
+
+  player->pos.x += player->velocity.x;
+  player->pos.y += player->velocity.y;
+
+  if (player->velocity.y > 0.f) {
+    player->velocity.y -= World::gravity;
+  }
+}
+
+static void PrintPlayerState() {
+  auto player = &game_state->player;
+  std::cout << "Position: " << player->pos.x << ", " << player->pos.y << '\n';
+
+  std::cout << "Velocity: " << player->velocity.x << ", " << player->velocity.y
+            << '\n';
+
+  std::cout << std::endl;
 }
 
 extern "C" {
@@ -92,6 +107,7 @@ EXPORT void SetRuntime(Runtime* runtime_) {
 }
 EXPORT void Update(void) {
   HandleEvents();
-  DrawPlayer(game_state->player_pos);
+  PrintPlayerState();
+  DrawPlayer();
 }
 }
